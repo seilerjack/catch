@@ -1,115 +1,150 @@
-import pygame
-import random
+#---------------------------------------------------------
+# IMPORTS
+#---------------------------------------------------------
 import sys
+import random
+import pygame
 
-# Initialize pygame
-pygame.init()
+
+#---------------------------------------------------------
+# CONSTANTS
+#---------------------------------------------------------
+# Colors
+WHITE         = ( 255, 255, 255 )
+BLACK         = ( 0, 0, 0 )
+RED           = ( 255, 0, 0 )
+BLUE          = ( 0, 0, 255 )
 
 # Screen settings
 SCREEN_WIDTH  = 640
 SCREEN_HEIGHT = 720
-screen = pygame.display.set_mode( ( SCREEN_WIDTH, SCREEN_HEIGHT ) )
-pygame.display.set_caption( "Catch the Objects!" )
-
-# Colors
-WHITE = ( 255, 255, 255 )
-BLACK = ( 0, 0, 0 )
-RED   = ( 255, 0, 0 )
-BLUE  = ( 0, 0, 255 )
+FPS           = 60
 
 # Game settings
 PLAYER_WIDTH  = 100
 PLAYER_HEIGHT = 20
-PLAYER_Y      = 580
-player_x      = ( SCREEN_WIDTH // 2 ) - ( PLAYER_WIDTH // 2 )
-player_speed  = 7
 
+# Player/Enemy settings
+PLAYER_Y      = 580
 ENEMY_WIDTH   = 60
 ENEMY_HEIGHT  = 40
-enemy_x       = random.randint( 0, SCREEN_WIDTH - ENEMY_WIDTH )
-enemy_y       = random.randint( 0, SCREEN_HEIGHT // 3 )
-enemy_speed_x = 3
-enemy_speed_y = 2
 
-OBJECT_WIDTH    = 20
-OBJECT_HEIGHT   = 20
-falling_objects = []
-object_speed    = 5
+# Projectile settings
+OBJECT_WIDTH  = 20
+OBJECT_HEIGHT = 20
+SPEED_MULT    = 1.25
 
-SPEED_MULT  = 1.25
-score = 0
-font  = pygame.font.SysFont(None, 48)
-clock = pygame.time.Clock()
-FPS   = 60
+#---------------------------------------------------------
+# VARIABLES
+#---------------------------------------------------------
+class Catch( object ):
 
-# Functions
-def draw_player():
-    pygame.draw.rect( screen, BLUE, ( player_x, PLAYER_Y, PLAYER_WIDTH, PLAYER_HEIGHT ) )
+    def __init__( self ):
+        # Initialize pygame
+        pygame.init()
 
-def draw_enemy():
-    pygame.draw.ellipse( screen, RED, ( enemy_x, enemy_y, ENEMY_WIDTH, ENEMY_HEIGHT ) )
+        # Player/Enemy/Projectile movement setup
+        self.player_x      = ( SCREEN_WIDTH // 2 ) - ( PLAYER_WIDTH // 2 )
+        self.player_speed  = 7
 
-def draw_falling_objects():
-    for obj in falling_objects:
-        pygame.draw.rect( screen, BLACK, obj )
+        self.enemy_x       = random.randint( 0, SCREEN_WIDTH - ENEMY_WIDTH )
+        self.enemy_y       = random.randint( 0, SCREEN_HEIGHT // 3 )
+        self.enemy_speed_x = 3
+        self.enemy_speed_y = 2
 
-def show_score():
-    score_text = font.render( f"Score: { score }", True, BLACK )
-    screen.blit( score_text, ( 10, 10 ) )
+        self.falling_objects = []
+        self.object_speed    = 5
 
-def check_collision( player_rect, obj_rect ):
-    return player_rect.colliderect( obj_rect )
+        # Game environemnt settings
+        self.score  = 0
+        self.font   = pygame.font.SysFont(None, 48)
+        self.clock  = pygame.time.Clock()
+        self.screen = pygame.display.set_mode( ( SCREEN_WIDTH, SCREEN_HEIGHT ) )
+        pygame.display.set_caption( "Catch the Objects!" )
 
-# Main game loop
-running = True
-while running:
-    screen.fill( WHITE )
+    #---------------------------------------------------------
+    # PROCEDURES
+    #---------------------------------------------------------
+    def draw_player( self ):
+        pygame.draw.rect( self.screen, BLUE, ( self.player_x, PLAYER_Y, PLAYER_WIDTH, PLAYER_HEIGHT ) )
 
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
+    def draw_enemy( self ):
+        pygame.draw.ellipse( self.screen, RED, ( self.enemy_x, self.enemy_y, ENEMY_WIDTH, ENEMY_HEIGHT ) )
 
-    # Player movement
-    keys = pygame.key.get_pressed()
-    if keys[ pygame.K_a]  and player_x > 0:
-        player_x -= player_speed
-    if keys[ pygame.K_d ] and player_x < SCREEN_WIDTH - PLAYER_WIDTH:
-        player_x += player_speed
+    def draw_falling_objects( self ):
+        for obj in self.falling_objects:
+            pygame.draw.rect( self.screen, BLACK, obj )
 
-    # Enemy movement, speed up when score increments by 10
-    speed_multiplier = SPEED_MULT if score % 10 == 0 else 1
-    enemy_x += enemy_speed_x * speed_multiplier
-    enemy_y += enemy_speed_y * speed_multiplier
+    def show_score( self ):
+        score_text = self.font.render( f"Score: { self.score }", True, BLACK )
+        self.screen.blit( score_text, ( 10, 10 ) )
 
-    if enemy_x <= 0 or enemy_x >= SCREEN_WIDTH - ENEMY_WIDTH:
-        enemy_speed_x *= -1
-    if enemy_y <= 0 or enemy_y >= SCREEN_HEIGHT // 3:
-        enemy_speed_y *= -1
+    def check_collision( self, player_rect, obj_rect ):
+        return player_rect.colliderect( obj_rect )
+    
+    def game_exit( self ):
+        pygame.quit()
+        sys.exit()
 
-    # Drop objects periodically
-    if random.randint( 1, 40 ) == 1:
-        falling_objects.append( pygame.Rect( enemy_x + ENEMY_WIDTH // 2, enemy_y + ENEMY_HEIGHT, OBJECT_WIDTH, OBJECT_HEIGHT ) )
+    def run_game( self ):
+        # Main game loop
+        running = True
+        while running:
+            self.screen.fill( WHITE )
 
-    # Update falling objects
-    for obj in falling_objects[ : ]:
-        obj.y += object_speed
-        if obj.y >= SCREEN_HEIGHT:
-            running = False
-            print( "Game Over!" )
-        if check_collision( pygame.Rect( player_x, PLAYER_Y, PLAYER_WIDTH, PLAYER_HEIGHT ), obj ):
-            falling_objects.remove( obj )
-            score += 1
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
 
-    # Drawing
-    draw_player()
-    draw_enemy()
-    draw_falling_objects()
-    show_score()
+            # Player movement
+            keys = pygame.key.get_pressed()
+            if keys[ pygame.K_a]  and self.player_x > 0:
+                self.player_x -= self.player_speed
+            if keys[ pygame.K_d ] and self.player_x < SCREEN_WIDTH - PLAYER_WIDTH:
+                self.player_x += self.player_speed
 
-    # Refresh the screen
-    pygame.display.flip()
-    clock.tick( FPS )
+            # Enemy movement, speed up when score increments by 10
+            speed_multiplier = SPEED_MULT if self.score % 10 == 0 else 1
+            self.enemy_x += self.enemy_speed_x * speed_multiplier
+            self.enemy_y += self.enemy_speed_y * speed_multiplier
 
-pygame.quit()
-sys.exit()
+            if self.enemy_x <= 0 or self.enemy_x >= SCREEN_WIDTH - ENEMY_WIDTH:
+                self.enemy_speed_x *= -1
+            if self.enemy_y <= 0 or self.enemy_y >= SCREEN_HEIGHT // 3:
+                self.enemy_speed_y *= -1
+
+            # Drop objects periodically
+            if random.randint( 1, 40 ) == 1:
+                self.falling_objects.append( pygame.Rect( self.enemy_x + ENEMY_WIDTH // 2, self.enemy_y + ENEMY_HEIGHT, OBJECT_WIDTH, OBJECT_HEIGHT ) )
+
+            # Update falling objects
+            for obj in self.falling_objects[ : ]:
+                obj.y += self.object_speed
+                if obj.y >= SCREEN_HEIGHT:
+                    running = False
+                    print( "Game Over!" )
+                if self.check_collision( pygame.Rect( self.player_x, PLAYER_Y, PLAYER_WIDTH, PLAYER_HEIGHT ), obj ):
+                    self.falling_objects.remove( obj )
+                    self.score += 1
+
+            # Drawing
+            self.draw_player()
+            self.draw_enemy()
+            self.draw_falling_objects()
+            self.show_score()
+
+            # Refresh the screen
+            pygame.display.flip()
+            self.clock.tick( FPS )
+
+        # Exit the game and cleanup resources
+        self.game_exit()
+
+
+#---------------------------------------------------------
+# EXECUTION
+#---------------------------------------------------------
+if __name__ == "__main__":
+    game = Catch()
+    game.run_game()
