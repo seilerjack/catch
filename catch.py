@@ -95,6 +95,14 @@ class Catch( object ):
 
     def check_collision( self, player_rect, obj_rect ):
         return player_rect.colliderect( obj_rect )
+    
+
+    def draw( self ):
+        # Drawing
+        self.draw_player()
+        self.draw_enemy()
+        self.draw_falling_objects()
+        self.show_score()
 
 
     def update( self ):
@@ -160,11 +168,8 @@ class Catch( object ):
                 # Update all moving objects
                 self.update()
 
-                # Drawing
-                self.draw_player()
-                self.draw_enemy()
-                self.draw_falling_objects()
-                self.show_score()
+                # Draw on screen
+                self.draw()
 
                 # Refresh the screen
                 pygame.display.flip()
