@@ -44,8 +44,8 @@ class CatchEnv( Env ):
         # Action space - Need representations for direction (L/R) and distance to move (pixels)
         self.action_space = spaces.Dict(
             {
-                # This will represent the direction the agent can move, left or right
-                "direction" : spaces.Discrete( 2 ),
+                # This will represent the direction the agent can move, stay, left or right
+                "direction" : spaces.Discrete( 3 ),
 
                 # This will represent how far the agent moves in selected direction (pixels)
                 "distance" : spaces.Box(
@@ -83,12 +83,84 @@ class CatchEnv( Env ):
         )
 
 
-    def _get_obs( self ):
-        pass
-
     def reset( self ):
-        pass
+        """ Reset to the episode instance.
 
+        Call to the in-game function restart that resets the
+        player's location, enemy's location, score, and clears
+        all falling objects. This will also return an observation
+        of this reset state for the start of a new episode.
+
+        Args:
+            argument_1 (CatchEnv): Reference to self, CatchEnv.
+
+        Returns:
+            spaces.Dict: returns an oberservation of the reset
+                         state.
+        """
+        self.game.restart()
+        return ( self._get_obs() )
+    
+
+    def _get_obs( self ):
+        """ Private getter for current state's observation.
+
+        Collects the following information and normalizes the
+        values for further manipulation: player position (x,y),
+        enemy position (x,y), falling object position(s) [(x,y)].
+
+        Args:
+            argument_1 (CatchEnv): Reference to self, CatchEnv.
+
+        Returns:
+            spaces.Dict: returns an oberservation of the current
+                         state.
+        """
+        # Normalize player position (x / SCREEN_WIDTH, y / SCREEN_HEIGHT)
+        player_obs = np.array( [
+                               ( self.game.player_x / ( SCREEN_WIDTH - PLAYER_WIDTH ) ),
+                               ( PLAYER_Y / SCREEN_HEIGHT )
+                               ] )
+
+        # Normalize enemy position
+        enemy_x_norm = self.game.enemy_x / ( SCREEN_WIDTH - ENEMY_WIDTH )
+        enemy_y_norm = ( self.game.enemy_y - ( SCREEN_HEIGHT // 3 ) ) / ( ( SCREEN_HEIGHT * 2 ) // 3 )
+
+        enemy_obs    = np.array( [ 
+                                 enemy_x_norm, 
+                                 enemy_y_norm 
+                                 ] )
+
+        # Normalize projectile positions and pad as needed
+        projectiles_obs = []
+        for obj in self.game.falling_objects[ : MAX_PROJECTILES ]:
+            proj_x = obj.x / ( SCREEN_WIDTH - OBJECT_WIDTH )
+            proj_y = obj.y / SCREEN_HEIGHT
+
+            projectiles_obs.append( np.array( [ 
+                                              proj_x, 
+                                              proj_y 
+                                              ] ) )
+        
+        # Pad with normalized (-1, -1) if fewer projectiles than MAX_PROJECTILES
+        while len( projectiles_obs ) < MAX_PROJECTILES:
+            projectiles_obs.append( np.array( [ 
+                                              -1.0, 
+                                              -1.0 
+                                              ] ) )
+
+        # Create normalized observation dictionary
+        observation = {
+                      "player"     : player_obs,
+                      "enemy"      : enemy_obs,
+                      "projectiles": np.array( projectiles_obs ),
+                      }
+
+        return ( observation )
+
+    # Should just be one full 'move' by the agent.
+    # Record an observation after the action has been applied
+    # and a reward calculated 
     def step( self ):
         pass
 
@@ -102,4 +174,4 @@ class CatchEnv( Env ):
 if __name__ == "__main__":
     GAME = Catch()
     env = CatchEnv( GAME )
-    GAME.run_game()
+    # GAME.run_game()
