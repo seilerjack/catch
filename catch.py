@@ -19,6 +19,7 @@ BLUE          = ( 0, 0, 255 )
 SCREEN_WIDTH  = 640
 SCREEN_HEIGHT = 720
 FPS           = 60
+PIXEL_BUFFER  = 5
 
 # Game settings
 PLAYER_WIDTH  = 100
@@ -52,17 +53,18 @@ class Catch( object ):
         pygame.init()
 
         # Player/Enemy/Projectile movement setup
-        self.player_x         = ( SCREEN_WIDTH // 2 ) - ( PLAYER_WIDTH // 2 )
-        self.player_speed     = 7
+        self.player_x           = ( SCREEN_WIDTH // 2 ) - ( PLAYER_WIDTH // 2 )
+        self.player_speed       = 7
 
-        self.enemy_x          = ( SCREEN_WIDTH // 2 ) - ( ENEMY_WIDTH // 2 )
-        self.enemy_y          = ( SCREEN_HEIGHT // 6 ) - ( ENEMY_HEIGHT // 2 )
-        self.enemy_speed_x    = 3
-        self.enemy_speed_y    = 2
-        self.speed_multiplier = 1
+        self.enemy_x            = ( SCREEN_WIDTH // 2 ) - ( ENEMY_WIDTH // 2 )
+        self.enemy_y            = ( SCREEN_HEIGHT // 6 ) - ( ENEMY_HEIGHT // 2 )
+        self.enemy_speed_x      = random.choice( [ i for i in range( -3,3 ) if i not in [ 1, 0, 1 ] ] )
+        self.enemy_speed_y      = random.choice( [ y for y in range( -2,2 ) if y not in [ -1, 0, 1 ] ] )
+        self.speed_multiplier   = 1
 
-        self.falling_objects  = []
-        self.object_speed     = 5
+        self.falling_objects    = []
+        self.object_speed       = 5
+        self.collision_detected = False
 
         # Game environemnt settings
         self.running = False
@@ -94,7 +96,35 @@ class Catch( object ):
 
 
     def check_collision( self, player_rect, obj_rect ):
-        return player_rect.colliderect( obj_rect )
+        self.collision_detected = False
+        if( player_rect.colliderect( obj_rect ) ):
+            self.collision_detected = True
+        return ( self.collision_detected )
+
+
+    def get_key_press( self, action=None ):
+        # Get the actual keys pressed by the user
+        keys = pygame.key.get_pressed()
+
+        # If an action is passed (0 = stay, 1 = left, 2 = right), mimic key presses:
+        if action is not None:
+            # Create a temporary keys list mimicking Pygame key behavior
+            keys = list( keys )  # Convert to mutable list if it's a tuple-like object
+            if action == 1:  # Left
+                keys[ pygame.K_a ] = True
+            elif action == 2:  # Right
+                keys[ pygame.K_d ] = True
+
+        # Handle left movement (player_x decreases) if 'a' or corresponding action is pressed
+        if keys[ pygame.K_a ] and self.player_x > 0 + PIXEL_BUFFER:
+            self.player_x -= self.player_speed
+        # Handle right movement (player_x increases) if 'd' or corresponding action is pressed
+        if keys[ pygame.K_d ] and self.player_x < SCREEN_WIDTH - PLAYER_WIDTH - PIXEL_BUFFER:
+            self.player_x += self.player_speed
+        # Handle game exit on ESC key press
+        if keys[ pygame.K_ESCAPE ]:
+            self.running = False
+            game_exit()
     
 
     def draw( self ):
@@ -105,15 +135,9 @@ class Catch( object ):
         self.show_score()
 
 
-    def update( self ):
+    def update( self, action=None ):
         # Player movement and ESC key for exiting the game
-        keys = pygame.key.get_pressed()
-        if keys[ pygame.K_a]  and self.player_x > 0:
-            self.player_x -= self.player_speed
-        if keys[ pygame.K_d ] and self.player_x < SCREEN_WIDTH - PLAYER_WIDTH:
-            self.player_x += self.player_speed
-        if keys[pygame.K_ESCAPE]:
-            game_exit()
+        self.get_key_press( action )
 
         # Enemy movement, speed up when score increments by 10
         self.speed_multiplier = SPEED_MULT if self.score % 10 == 0 else 1
@@ -122,7 +146,7 @@ class Catch( object ):
 
         if self.enemy_x <= 0 or self.enemy_x >= SCREEN_WIDTH - ENEMY_WIDTH:
             self.enemy_speed_x *= -1
-        if self.enemy_y <= 0 or self.enemy_y >= SCREEN_HEIGHT // 3:
+        if self.enemy_y <= 0 or self.enemy_y >= ( SCREEN_HEIGHT - ENEMY_HEIGHT ) / 3:
             self.enemy_speed_y *= -1
 
         # Drop objects periodically
@@ -132,7 +156,7 @@ class Catch( object ):
         # Update falling objects
         for obj in self.falling_objects[ : ]:
             obj.y += self.object_speed
-            if obj.y >= SCREEN_HEIGHT:
+            if obj.y >= ( SCREEN_HEIGHT - OBJECT_HEIGHT - PIXEL_BUFFER ):
                 if self.running:  # To prevent spamming "Game Over!"
                     print("Game Over!")
                 self.running = False
@@ -142,21 +166,23 @@ class Catch( object ):
 
 
     def restart( self ):
-        self.running          = True
-        self.score            = 0
-        self.player_x         = ( SCREEN_WIDTH // 2 ) - ( PLAYER_WIDTH // 2 )
-        self.enemy_x          = ( SCREEN_WIDTH // 2 ) - ( ENEMY_WIDTH // 2 )
-        self.enemy_y          = ( SCREEN_HEIGHT // 6 ) - ( ENEMY_HEIGHT // 2 )
-        self.enemy_speed_x    = 3
-        self.enemy_speed_y    = 2
-        self.speed_multiplier = 1
+        self.running            = True
+        self.score              = 0
+        self.player_x           = ( SCREEN_WIDTH // 2 ) - ( PLAYER_WIDTH // 2 )
+        self.enemy_x            = ( SCREEN_WIDTH // 2 ) - ( ENEMY_WIDTH // 2 )
+        self.enemy_y            = ( SCREEN_HEIGHT // 6 ) - ( ENEMY_HEIGHT // 2 )
+        self.enemy_speed_x      = random.choice( [ i for i in range( -3,3 ) if i not in [ 1, 0, 1 ] ] )
+        self.enemy_speed_y      = random.choice( [ y for y in range( -2,2 ) if y not in [ -1, 0, 1 ] ] )
+        self.speed_multiplier   = 1
+        self.collision_detected = False
         self.falling_objects.clear()
 
 
-    def run_game( self ):
+    def run_game( self, action=None ):
         # Main game loop
         while True:
-            self.restart()
+        # Only call restart if we are playing outside the RL environment
+            if action is None: self.restart()
             while self.running:
                 self.screen.fill( WHITE )
 
@@ -166,7 +192,7 @@ class Catch( object ):
                         sys.exit()
 
                 # Update all moving objects
-                self.update()
+                self.update( action )
 
                 # Draw on screen
                 self.draw()
