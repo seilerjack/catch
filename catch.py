@@ -18,7 +18,7 @@ BLUE          = ( 0, 0, 255 )
 # Screen settings
 SCREEN_WIDTH  = 640
 SCREEN_HEIGHT = 720
-FPS           = 60
+FPS           = 30
 PIXEL_BUFFER  = 5
 
 # Game settings
@@ -65,6 +65,7 @@ class Catch( object ):
         self.falling_objects    = []
         self.object_speed       = 5
         self.collision_detected = False
+        self.temp_collision_det = False
 
         # Game environemnt settings
         self.running = False
@@ -89,6 +90,19 @@ class Catch( object ):
         for obj in self.falling_objects:
             pygame.draw.rect( self.screen, BLACK, obj )
 
+    
+    def draw_distance_to_obj( self ):
+        for obj in self.falling_objects:
+            # Draw a line from the center of the player to the center of the object
+            player_center_x = self.player_x + PLAYER_WIDTH // 2
+            player_center_y = PLAYER_Y + PLAYER_HEIGHT // 2
+            obj_center_x    = obj.x + OBJECT_WIDTH // 2
+            obj_center_y    = obj.y + OBJECT_HEIGHT // 2
+
+            # Draw the line if the object's y-position is less than or equal to the player's y-position
+            if obj.y <= PLAYER_Y:
+                pygame.draw.line( self.screen, RED, ( player_center_x, player_center_y ), ( obj_center_x, obj_center_y ), 2 )
+
 
     def show_score( self ):
         score_text = self.font.render( f"Score: { self.score }", True, BLACK )
@@ -96,9 +110,9 @@ class Catch( object ):
 
 
     def check_collision( self, player_rect, obj_rect ):
-        self.collision_detected = False
         if( player_rect.colliderect( obj_rect ) ):
             self.collision_detected = True
+            self.temp_collision_det = True
         return ( self.collision_detected )
 
 
@@ -132,10 +146,13 @@ class Catch( object ):
         self.draw_player()
         self.draw_enemy()
         self.draw_falling_objects()
+        self.draw_distance_to_obj()
         self.show_score()
 
 
     def update( self, action=None ):
+        # Set the temporary collision flag to false
+        self.temp_collision_det = False
         # Player movement and ESC key for exiting the game
         self.get_key_press( action )
 
@@ -155,6 +172,8 @@ class Catch( object ):
 
         # Update falling objects
         for obj in self.falling_objects[ : ]:
+            # Reset collision_detected at the start of each frame
+            self.collision_detected = False
             obj.y += self.object_speed
             if obj.y >= ( SCREEN_HEIGHT - OBJECT_HEIGHT - PIXEL_BUFFER ):
                 if self.running:  # To prevent spamming "Game Over!"
@@ -163,6 +182,7 @@ class Catch( object ):
             if self.check_collision( pygame.Rect( self.player_x, PLAYER_Y, PLAYER_WIDTH, PLAYER_HEIGHT ), obj ):
                 self.falling_objects.remove( obj )
                 self.score += 1
+                continue
 
 
     def restart( self ):
@@ -175,6 +195,7 @@ class Catch( object ):
         self.enemy_speed_y      = random.choice( [ y for y in range( -2,2 ) if y not in [ -1, 0, 1 ] ] )
         self.speed_multiplier   = 1
         self.collision_detected = False
+        self.temp_collision_det = False
         self.falling_objects.clear()
 
 
