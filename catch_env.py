@@ -29,7 +29,7 @@ ENEMY_HEIGHT  = 40
 OBJECT_WIDTH    = 20
 OBJECT_HEIGHT   = 20
 SPEED_MULT      = 1.25
-MAX_PROJECTILES = 1
+MAX_PROJECTILES = 10
 PIXEL_BUFFER    = 7
 
 #---------------------------------------------------------
@@ -41,9 +41,10 @@ class CatchEnv( Env ):
         super().__init__()
 
         # Initialize the step state and reward
-        self.done        = False
-        self.reward_val  = 0
-        self.prev_x_dist = SCREEN_WIDTH / 2 # Initialize to middle of the screen
+        self.done           = False
+        self.reward_val     = 0
+        self.prev_x_dist    = SCREEN_WIDTH / 2 # Initialize to middle of the screen
+        self.prev_direction = None             # Initialize with no prior direction
 
         # Game instance to apply Environment on
         self.game = game
@@ -73,7 +74,7 @@ class CatchEnv( Env ):
                                    low   = 0,
                                    high  = 1,
                                    shape = ( MAX_PROJECTILES , ),
-                                   dtype = int,
+                                   dtype = np.int32,
                                    ),
             }
         )
@@ -97,14 +98,31 @@ class CatchEnv( Env ):
         """
         # We need the following line to seed self.np_random
         super().reset( seed=seed )
-        self.done        = False
-        self.reward_val  = 0
-        self.prev_x_dist = SCREEN_WIDTH / 2
+        
+        # Reset relevant CatchEnv attributes
+        self.done           = False
+        self.reward_val     = 0
+        self.prev_x_dist    = SCREEN_WIDTH / 2
+        self.prev_direction = None
+
+        # Reset relevant Catch attributes
         self.game.restart()
         return ( self._get_obs(), self._get_info() )
     
 
     def _get_info( self ):
+        """ Private getter for extra relevant game info.
+
+        Call to the in-game score attribute to give the gym
+        environment score context for observation/reward processes.
+        
+        Args:
+            arguement_1 (CatchEnv): Reference to self, CatchEnv.
+
+        Returns:
+            spaces.Dict: returns a observation of the game's current
+                         score.
+        """
         info = {
                "score" : self.game.score
                }
@@ -125,12 +143,14 @@ class CatchEnv( Env ):
             spaces.Dict: returns an oberservation of the current
                          state.
         """
-        
+        # Collect the player's current position.
         player_obs = np.array( [
                                self.game.player_x,
                                PLAYER_Y
                                ] )
 
+        # Collect position data for any active falling objects and
+        # mask off 'active' projectiles for futher processing.
         projectiles_obs = []
         mask            = []
         for obj in self.game.falling_objects[ : MAX_PROJECTILES ]:
@@ -143,7 +163,7 @@ class CatchEnv( Env ):
                                               ] ) )
             mask.append( 1 ) # Mark object as active
         
-        # Pad with normalized (-1, -1) if fewer projectiles than MAX_PROJECTILES
+        # Pad with normalized (0, 0) if fewer projectiles than MAX_PROJECTILES
         while len( projectiles_obs ) < MAX_PROJECTILES:
             projectiles_obs.append( np.array( [ 
                                               0, 
@@ -234,31 +254,16 @@ class CatchEnv( Env ):
         # Apply heavier emphasis on X position
         reward -= ( 0.8 * ( x_distance / SCREEN_WIDTH ) + 0.2 * ( y_distance / SCREEN_HEIGHT ) )
 
-        # Punish unnecessary movements
-        # Specifically if there are no falling objects on the screen.
-        mvmt_reward = 0
-        if len( active_projectiles ) == 0 and self.prev_x_dist != player_x:
-            # print( "Penalizing for unncessary movement" )
-            # Unnecessary movement, penalize.
-            mvmt_reward -= 5
-        elif len( active_projectiles ) == 0 and self.prev_x_dist == player_x:
-            # Reward when the agent is efficient with it's movement
-            mvmt_reward += 5
-        elif len( active_projectiles ) > 0:        
-            # If there are falling objects and the player goes from directly under an 
-            # object to farther away, punish that action.
-            if x_distance > self.prev_x_dist:
-                # print( "Penalizing for moving away from the object" )
-                mvmt_reward -= 5
-            if x_distance == self.prev_x_dist:
-                # print( "Rewarding for staying close to the object" )
-                mvmt_reward += 5
-
-        self.prev_x_dist = x_distance
-
         if self.game.temp_collision_det == True:
-            reward                       = 1000              # Full reward for catching the object
+            print( "Collision detected, increasing reward by 1000." )
+            reward                       = 1000             # Full reward for catching the object
             self.game.temp_collision_det = False            # Reset the collision flag
             return ( reward )                               # Return immediately if an object is caught
 
-        return ( reward + mvmt_reward )
+        # Provide a massive penalty for dying.
+        death_penalty = 0
+        if self.game.running == False:
+            death_penalty -= 5000
+
+        # return ( reward + mvmt_reward + death_penalty )
+        return ( reward + death_penalty )
