@@ -41,12 +41,14 @@ class CatchEnv( Env ):
         super().__init__()
 
         # Initialize the step state and reward
-        self.done       = False
-        self.reward_val = 0
+        self.done        = False
+        self.reward_val  = 0
+        self.prev_x_dist = SCREEN_WIDTH / 2 # Initialize to middle of the screen
 
         # Game instance to apply Environment on
         self.game = game
 
+        # Action space - Need representations for direction (L/R)
         self.action_space = spaces.Discrete( 3 )
 
         # Observation space - Need position of the following: The Player, Falling Projectiles, Enemy(?)
@@ -95,8 +97,9 @@ class CatchEnv( Env ):
         """
         # We need the following line to seed self.np_random
         super().reset( seed=seed )
-        self.done       = False
-        self.reward_val = 0
+        self.done        = False
+        self.reward_val  = 0
+        self.prev_x_dist = SCREEN_WIDTH / 2
         self.game.restart()
         return ( self._get_obs(), self._get_info() )
     
@@ -113,7 +116,7 @@ class CatchEnv( Env ):
 
         Collects the following information and normalizes the
         values for further manipulation: player position (x,y),
-        falling object position(s) [(x,y)].
+        enemy position (x,y), falling object position(s) [(x,y)].
 
         Args:
             argument_1 (CatchEnv): Reference to self, CatchEnv.
@@ -121,13 +124,13 @@ class CatchEnv( Env ):
         Returns:
             spaces.Dict: returns an oberservation of the current
                          state.
-        """        
+        """
+        
         player_obs = np.array( [
                                self.game.player_x,
                                PLAYER_Y
                                ] )
 
-        # Normalize projectile positions and pad as needed
         projectiles_obs = []
         mask            = []
         for obj in self.game.falling_objects[ : MAX_PROJECTILES ]:
@@ -231,10 +234,31 @@ class CatchEnv( Env ):
         # Apply heavier emphasis on X position
         reward -= ( 0.8 * ( x_distance / SCREEN_WIDTH ) + 0.2 * ( y_distance / SCREEN_HEIGHT ) )
 
+        # Punish unnecessary movements
+        # Specifically if there are no falling objects on the screen.
+        mvmt_reward = 0
+        if len( active_projectiles ) == 0 and self.prev_x_dist != player_x:
+            # print( "Penalizing for unncessary movement" )
+            # Unnecessary movement, penalize.
+            mvmt_reward -= 5
+        elif len( active_projectiles ) == 0 and self.prev_x_dist == player_x:
+            # Reward when the agent is efficient with it's movement
+            mvmt_reward += 5
+        elif len( active_projectiles ) > 0:        
+            # If there are falling objects and the player goes from directly under an 
+            # object to farther away, punish that action.
+            if x_distance > self.prev_x_dist:
+                # print( "Penalizing for moving away from the object" )
+                mvmt_reward -= 5
+            if x_distance == self.prev_x_dist:
+                # print( "Rewarding for staying close to the object" )
+                mvmt_reward += 5
+
+        self.prev_x_dist = x_distance
+
         if self.game.temp_collision_det == True:
-            print( "Collision detected, increasing reward by 1000." )
-            reward                       = 1000             # Full reward for catching the object
+            reward                       = 1000              # Full reward for catching the object
             self.game.temp_collision_det = False            # Reset the collision flag
             return ( reward )                               # Return immediately if an object is caught
 
-        return ( reward )
+        return ( reward + mvmt_reward )

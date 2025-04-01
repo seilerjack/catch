@@ -179,7 +179,7 @@ class Catch( object ):
             obj.y += self.object_speed
             if obj.y >= ( SCREEN_HEIGHT - OBJECT_HEIGHT - PIXEL_BUFFER ):
                 if self.running:  # To prevent spamming "Game Over!"
-                    print("Game Over!")
+                    print(f"Game Over! Score: { self.score }")
                 self.running = False
             if self.check_collision( pygame.Rect( self.player_x, PLAYER_Y, PLAYER_WIDTH, PLAYER_HEIGHT ), obj ):
                 self.falling_objects.remove( obj )
