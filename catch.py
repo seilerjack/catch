@@ -55,7 +55,7 @@ class Catch( object ):
 
         # Player/Enemy/Projectile movement setup
         self.player_x           = ( SCREEN_WIDTH // 2 ) - ( PLAYER_WIDTH // 2 )
-        self.player_speed       = 12
+        self.player_speed       = 7
 
         self.enemy_x            = ( SCREEN_WIDTH // 2 ) - ( ENEMY_WIDTH // 2 )
         self.enemy_y            = ( SCREEN_HEIGHT // 6 ) - ( ENEMY_HEIGHT // 2 )

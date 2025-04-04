@@ -74,7 +74,7 @@ class CatchEnv( Env ):
                                    low   = 0,
                                    high  = 1,
                                    shape = ( MAX_PROJECTILES , ),
-                                   dtype = np.int32,
+                                   dtype = np.int64,
                                    ),
             }
         )
@@ -255,15 +255,8 @@ class CatchEnv( Env ):
         reward -= ( 0.8 * ( x_distance / SCREEN_WIDTH ) + 0.2 * ( y_distance / SCREEN_HEIGHT ) )
 
         if self.game.temp_collision_det == True:
-            print( "Collision detected, increasing reward by 1000." )
             reward                       = 1000             # Full reward for catching the object
             self.game.temp_collision_det = False            # Reset the collision flag
             return ( reward )                               # Return immediately if an object is caught
 
-        # Provide a massive penalty for dying.
-        death_penalty = 0
-        if self.game.running == False:
-            death_penalty -= 5000
-
-        # return ( reward + mvmt_reward + death_penalty )
-        return ( reward + death_penalty )
+        return ( reward )
