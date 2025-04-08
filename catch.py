@@ -19,7 +19,7 @@ BLUE          = ( 0, 0, 255 )
 # SCREEN_WIDTH  = 640
 SCREEN_WIDTH  = 500
 SCREEN_HEIGHT = 720
-FPS           = 30
+FPS           = 60
 PIXEL_BUFFER  = 5
 
 # Game settings

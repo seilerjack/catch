@@ -44,7 +44,6 @@ class CatchEnv( Env ):
         self.done           = False
         self.reward_val     = 0
         self.prev_x_dist    = SCREEN_WIDTH / 2 # Initialize to middle of the screen
-        self.prev_direction = None             # Initialize with no prior direction
 
         # Game instance to apply Environment on
         self.game = game
@@ -103,7 +102,6 @@ class CatchEnv( Env ):
         self.done           = False
         self.reward_val     = 0
         self.prev_x_dist    = SCREEN_WIDTH / 2
-        self.prev_direction = None
 
         # Reset relevant Catch attributes
         self.game.restart()
