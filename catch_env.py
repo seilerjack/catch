@@ -1,35 +1,34 @@
 #---------------------------------------------------------
 # IMPORTS
 #---------------------------------------------------------
-import pygame
-import numpy   as np
+import numpy     as np
 
-from catch     import Catch
-from gymnasium import spaces, Env
+from gymnasium   import spaces, Env
 
 
 #---------------------------------------------------------
 # CONSTANTS
 #---------------------------------------------------------
 # Screen settings
-SCREEN_WIDTH  = 500
-SCREEN_HEIGHT = 720
-FPS           = 60
+SCREEN_WIDTH    = 500
+SCREEN_HEIGHT   = 720
+FPS             = 60
 
 # Game settings
-PLAYER_WIDTH  = 100
-PLAYER_HEIGHT = 20
+PLAYER_WIDTH    = 100
+PLAYER_HEIGHT   = 20
 
 # Player/Enemy settings
-PLAYER_Y      = 580
-ENEMY_WIDTH   = 60
-ENEMY_HEIGHT  = 40
+PLAYER_Y        = 580
+ENEMY_WIDTH     = 60
+ENEMY_HEIGHT    = 40
 
 # Projectile settings
 OBJECT_WIDTH    = 20
 OBJECT_HEIGHT   = 20
 SPEED_MULT      = 1.25
 MAX_PROJECTILES = 10
+MAX_SPEED       = 5
 PIXEL_BUFFER    = 7
 
 #---------------------------------------------------------
@@ -40,13 +39,24 @@ class CatchEnv( Env ):
     def __init__( self, game ):
         super().__init__()
 
+        # Game instance to apply Environment on
+        self.game = game
+
         # Initialize the step state and reward
         self.done           = False
         self.reward_val     = 0
-        self.prev_x_dist    = SCREEN_WIDTH / 2 # Initialize to middle of the screen
+        self.last_player_x  = ( SCREEN_WIDTH // 2 ) - ( PLAYER_WIDTH // 2 ) # Initialize to middle of the screen
+        
+        # Metrics used for difficulty scaling during training
+        self.episode_num                      = 0
 
-        # Game instance to apply Environment on
-        self.game = game
+        self.info_logs = {
+                         "episode_num"          : self.episode_num,
+                         "object_speed"         : self.game.object_speed,
+                         "object_count"         : self.game.max_num_objects,
+                         "score"                : self.game.score,
+                         "terminal_observation" : {}
+                         }
 
         # Action space - Need representations for direction (L/R)
         self.action_space = spaces.Discrete( 3 )
@@ -62,7 +72,7 @@ class CatchEnv( Env ):
                                      ),
 
                 # This will represent the locations of the falling projectiles [(x, y)]
-                "projectiles" : spaces.Box(               #    X coord range                    Y coord range                                           Num proj to track
+                "projectiles" : spaces.Box(               #    X coord range                    Y coord range                           Num proj to track
                                           low  = np.array( [ [ 0,                               0                                 ] ] * MAX_PROJECTILES ),
                                           high = np.array( [ [ ( SCREEN_WIDTH - OBJECT_WIDTH ), ( SCREEN_HEIGHT - OBJECT_HEIGHT ) ] ] * MAX_PROJECTILES ),
                                           dtype= float,
@@ -101,30 +111,33 @@ class CatchEnv( Env ):
         # Reset relevant CatchEnv attributes
         self.done           = False
         self.reward_val     = 0
-        self.prev_x_dist    = SCREEN_WIDTH / 2
+        self.last_player_x  = ( SCREEN_WIDTH // 2 ) - ( PLAYER_WIDTH // 2 )
 
         # Reset relevant Catch attributes
         self.game.restart()
+
+        # Increment episode based settings
+        self.episode_num += 1
+        self.info_logs[ "episode_num" ] = self.episode_num
+
         return ( self._get_obs(), self._get_info() )
     
 
     def _get_info( self ):
         """ Private getter for extra relevant game info.
 
-        Call to the in-game score attribute to give the gym
-        environment score context for observation/reward processes.
+        Return relevant attributes to give the gym
+        environment extra context for observation/reward processes.
         
         Args:
             arguement_1 (CatchEnv): Reference to self, CatchEnv.
 
         Returns:
             spaces.Dict: returns a observation of the game's current
-                         score.
+                         score, episode count, object count, object speed,
+                         and average score.
         """
-        info = {
-               "score" : self.game.score
-               }
-        return ( info )
+        return ( self.info_logs )
     
 
     def _get_obs( self ):
@@ -190,7 +203,9 @@ class CatchEnv( Env ):
 
         # Check if the action resulted in the game ending
         if self.game.running == False:
-            self.done = True
+            # Set the flag alerting the episode has finished
+            self.info_logs[ "score" ] = self.game.score
+            self.done                 = True
 
         # Take an observation of the game state after the action
         observation = self._get_obs()
@@ -228,8 +243,11 @@ class CatchEnv( Env ):
         for index in active_projectiles:
             coord_pairs_of_actv_proj.append( obs[ "projectiles" ][ index ] )
 
-        # Sort by the second element of each sublist
-        coord_pairs_of_actv_proj.sort( reverse=True, key=lambda x: x[ 1 ] )
+        # If there are no falling objects return a reward of 0
+        if not coord_pairs_of_actv_proj:
+            return reward
+        # Else sort by the second element of each sublist
+        else: coord_pairs_of_actv_proj.sort( reverse=True, key=lambda x: x[ 1 ] )
 
         # Grab the closest object that isn't aleady below the player
         closest_obj = ( 0, 0 )
@@ -246,15 +264,26 @@ class CatchEnv( Env ):
         obj_center_y = closest_obj[ 1 ] - ( OBJECT_HEIGHT // 2 )
 
         # Compute separate x and y distances
-        x_distance = abs( player_center_x - obj_center_x )
-        y_distance = abs( player_center_y - obj_center_y )
+        x_distance = abs( player_center_x - obj_center_x ) / SCREEN_WIDTH
+        # y_distance = abs( player_center_y - obj_center_y ) / SCREEN_HEIGHT
 
-        # Apply heavier emphasis on X position
-        reward -= ( 0.8 * ( x_distance / SCREEN_WIDTH ) + 0.2 * ( y_distance / SCREEN_HEIGHT ) )
+        # Shaping reward: prioritize X alignment
+        reward += 1.0 - x_distance  # closer is better
+
+        # Bonus if proactively standing under an object (before it reaches player Y)
+        if abs( player_center_x - obj_center_x ) < OBJECT_WIDTH and obj_center_y < PLAYER_Y:
+            reward += 0.3  # proactive bonus
+
+        # Penalize excessive movement (efficiency)
+        movement_penalty = abs(player_x - self.last_player_x) / SCREEN_WIDTH
+        reward -= 0.5 * movement_penalty
 
         if self.game.temp_collision_det == True:
-            reward                       = 1000             # Full reward for catching the object
+            reward                       = 10               # Full reward for catching the object
             self.game.temp_collision_det = False            # Reset the collision flag
             return ( reward )                               # Return immediately if an object is caught
+
+        # Save last player position for next step
+        self.last_player_x = player_x
 
         return ( reward )

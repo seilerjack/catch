@@ -9,6 +9,8 @@ import pygame
 #---------------------------------------------------------
 # CONSTANTS
 #---------------------------------------------------------
+DEBUG         = False
+
 # Colors
 WHITE         = ( 255, 255, 255 )
 BLACK         = ( 0, 0, 0 )
@@ -35,7 +37,7 @@ ENEMY_HEIGHT  = 40
 OBJECT_WIDTH    = 20
 OBJECT_HEIGHT   = 20
 SPEED_MULT      = 1.25
-MAX_PROJECTILES = 1
+MAX_PROJECTILES = 10
 
 #---------------------------------------------------------
 # PROCEDURES
@@ -64,9 +66,12 @@ class Catch( object ):
         self.speed_multiplier   = 1
 
         self.falling_objects    = []
-        self.object_speed       = 3
+        self.object_speed       = 5
+        self.max_num_objects    = MAX_PROJECTILES
         self.collision_detected = False
         self.temp_collision_det = False
+        self.frames_since_last_drop = 0
+        self.drop_cooldown          = 20  # frames between drops
 
         # Game environemnt settings
         self.running = False
@@ -147,7 +152,7 @@ class Catch( object ):
         self.draw_player()
         self.draw_enemy()
         self.draw_falling_objects()
-        self.draw_distance_to_obj()
+        if DEBUG: self.draw_distance_to_obj()
         self.show_score()
 
 
@@ -168,9 +173,12 @@ class Catch( object ):
             self.enemy_speed_y *= -1
 
         # Drop objects periodically
-        if random.randint( 1, 75 ) == 1:
-            if len( self.falling_objects ) < MAX_PROJECTILES:
-                self.falling_objects.append( pygame.Rect( self.enemy_x + ENEMY_WIDTH // 2, self.enemy_y + ENEMY_HEIGHT, OBJECT_WIDTH, OBJECT_HEIGHT ) )
+        self.frames_since_last_drop += 1
+        if self.frames_since_last_drop >= self.drop_cooldown:
+            if random.randint( 1, 75 ) == 1:
+                if len( self.falling_objects ) < self.max_num_objects:
+                    self.falling_objects.append( pygame.Rect( self.enemy_x + ENEMY_WIDTH // 2, self.enemy_y + ENEMY_HEIGHT, OBJECT_WIDTH, OBJECT_HEIGHT ) )
+                    self.frames_since_last_drop = 0
 
         # Update falling objects
         for obj in self.falling_objects[ : ]:
@@ -203,26 +211,26 @@ class Catch( object ):
 
     def run_game( self, action=None ):
         # Main game loop
-        # while True:
+        while True:
         # Only call restart if we are playing outside the RL environment
-            # if action is None: self.restart()
-            # while self.running:
-        self.screen.fill( WHITE )
+            if action is None: self.restart()
+            while self.running:
+                self.screen.fill( WHITE )
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        pygame.quit()
+                        sys.exit()
 
-        # Update all moving objects
-        self.update( action )
+                # Update all moving objects
+                self.update( action )
 
-        # Draw on screen
-        self.draw()
+                # Draw on screen
+                self.draw()
 
-        # Refresh the screen
-        pygame.display.flip()
-        self.clock.tick( FPS )
+                # Refresh the screen
+                pygame.display.flip()
+                self.clock.tick( FPS )
 
 #---------------------------------------------------------
 # EXECUTION
