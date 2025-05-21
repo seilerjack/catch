@@ -8,11 +8,11 @@ This project implements a custom reinforcement learning agent to play a classic 
 
 In Catch, the player controls a paddle fixed at the bottom of the screen. Objects fall from the top, and the player must move left or right to catch them. The difficulty increases over time with:
 
--More objects on screen.
+    -More objects on screen.
 
--Faster falling speed.
+    -Faster falling speed.
 
--Variable drop timing to challenge reaction time and decision-making.
+    -Variable drop timing to challenge reaction time and decision-making.
 
 --------------------------------------------------------------------------------------------------------
 
@@ -52,13 +52,13 @@ In Catch, the player controls a paddle fixed at the bottom of the screen. Object
 
 🧪 Training Setup
 
-Multiple environments for faster sampling
+    -Multiple environments for faster sampling
 
-Adaptive difficulty: Object count and speed increase based on performance
+    -Adaptive difficulty: Object count and speed increase based on performance
 
-Logging via TensorBoard and custom callback
+    -Logging via TensorBoard and custom callback
 
-Periodic model checkpointing
+    -Periodic model checkpointing
 
 --------------------------------------------------------------------------------------------------------
 
